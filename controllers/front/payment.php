@@ -62,7 +62,10 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             'current_module_uri' => $this->module->getPathUri(),
             'payment_gateway_name' => $this->module->getPaymentGatewayNameByCurrencyCode($currency->iso_code),
             'branding_color' => ($currency->iso_code == "AUD") ? "rgb(57, 112, 255)" : "rgb(49, 181, 156)",
-            'doc_link' => ($currency->iso_code == "AUD") ? 'https://www.latitudepay.com/how-it-works/' : 'https://www.genoapay.com/how-it-works/'
+            'doc_link' => ($currency->iso_code == "AUD") ? 'https://www.latitudepay.com/how-it-works/' : 'https://www.genoapay.com/how-it-works/',
+            'amount' => $cart->getOrderTotal(),
+            'images_api_url' => Tools::getValue(Latitude_Official::LATITUDE_FINANCE_IMAGES_API_URL, Latitude_Official::DEFAULT_IMAGES_API_URL),
+            'full_block' => true
         ));
 
 

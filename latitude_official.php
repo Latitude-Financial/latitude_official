@@ -14,20 +14,19 @@ require_once (__DIR__.'/models/LatitudeRefundTransaction.php');
 
 class Latitude_Official extends PaymentModule
 {
-    protected $_html = '';
+    /**
+     * @var string
+     */
+    const GENOAPAY_PAYMENT_METHOD_CODE = 'Genoapay';
 
     /**
      * @var string
      */
-    public $gatewayName = '';
+    const LATITUDE_PAYMENT_METHOD_CODE = 'Latitudepay';
 
     /**
-     * @var object
+     * @var array
      */
-    public $gateway = '';
-
-    const GENOAPAY_PAYMENT_METHOD_CODE = 'Genoapay';
-    const LATITUDE_PAYMENT_METHOD_CODE = 'Latitudepay';
     const ALLOWED_PAYMENT_GATEWAYS= [self::GENOAPAY_PAYMENT_METHOD_CODE, self::LATITUDE_PAYMENT_METHOD_CODE];
 
     /**
@@ -54,8 +53,20 @@ class Latitude_Official extends PaymentModule
      * @var string - The data would be fetch from the API
      */
     const LATITUDE_FINANCE_TITLE = 'LATITUDE_FINANCE_TITLE';
+
+    /**
+     * @var string
+     */
     const LATITUDE_FINANCE_DESCRIPTION = 'LATITUDE_FINANCE_DESCRIPTION';
+
+    /**
+     * @var string
+     */
     const LATITUDE_FINANCE_MIN_ORDER_TOTAL = 'LATITUDE_FINANCE_MIN_ORDER_TOTAL';
+
+    /**
+     * @var string
+     */
     const LATITUDE_FINANCE_MAX_ORDER_TOTAL = 'LATITUDE_FINANCE_MAX_ORDER_TOTAL';
 
     /**
@@ -84,6 +95,31 @@ class Latitude_Official extends PaymentModule
     const LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY = 'LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY';
 
     /**
+     * @var string
+     */
+    const LATITUDE_FINANCE_IMAGES_API_URL = 'LATITUDE_FINANCE_IMAGES_API_URL';
+
+    /**
+     * @var string
+     */
+    const DEFAULT_IMAGES_API_URL = 'https://images.latitudepayapps.com/';
+
+    /**
+     * @var string
+     */
+    protected $_html = '';
+
+    /**
+     * @var string
+     */
+    public $gatewayName = '';
+
+    /**
+     * @var object
+     */
+    public $gateway = '';
+
+    /**
     * List of hooks needed in this module
     * @var array
     */
@@ -98,6 +134,9 @@ class Latitude_Official extends PaymentModule
         'actionOrderSlipAdd'
     );
 
+    /**
+     * Latitude_Official constructor.
+     */
     public function __construct()
     {
         /**
@@ -113,7 +152,7 @@ class Latitude_Official extends PaymentModule
          */
         $this->tab = 'payments_gateways';
 
-        $this->version = '1.0';
+        $this->version = '1.1';
         $this->author = 'Latitude Financial Services';
 
         /**
@@ -179,6 +218,10 @@ class Latitude_Official extends PaymentModule
         return true;
     }
 
+    /**
+     * Register a list of hooks
+     * @return bool
+     */
     protected function registerHooks()
     {
         foreach ($this->hooks as $hook) {
@@ -229,15 +272,24 @@ class Latitude_Official extends PaymentModule
             && Configuration::deleteByName(self::LATITUDE_FINANCE_MIN_ORDER_TOTAL)
             && Configuration::deleteByName(self::LATITUDE_FINANCE_MAX_ORDER_TOTAL)
             && Configuration::deleteByName(self::ENVIRONMENT)
-            && Configuration::deleteByName(self::LATITUDE_FINANCE_DEBUG_MODE);
+            && Configuration::deleteByName(self::LATITUDE_FINANCE_DEBUG_MODE)
+            && Configuration::deleteByName(self::LATITUDE_FINANCE_IMAGES_API_URL);
     }
 
+    /**
+     * Append stylesheet files into template header
+     * @param $params
+     */
     public function hookHeader($params)
     {
          $this->context->controller->addCSS($this->_path . '/views/css/genoapay.css');
          $this->context->controller->addCSS($this->_path . '/views/css/latitudepay.css');
     }
 
+    /**
+     * Add refund script to backend template
+     * @return null
+     */
     public function hookBackOfficeHeader()
     {
         if (Tools::getValue('controller') == "AdminOrders" && Tools::getValue('id_order')) {
@@ -253,6 +305,11 @@ class Latitude_Official extends PaymentModule
         return null;
     }
 
+    /**
+     * Display order return block
+     * @param $params
+     * @return mixed
+     */
     public function hookDisplayPaymentReturn($params)
     {
         $this->context->smarty->assign(array(
@@ -267,6 +324,11 @@ class Latitude_Official extends PaymentModule
         return $this->display(__FILE__, 'payment_return.tpl');
     }
 
+    /**
+     * Display refund block inside order detail page
+     * @param $params
+     * @return mixed
+     */
     public function hookDisplayAdminOrderContentOrder($params)
     {
         $id_order = Tools::getValue('id_order');
@@ -292,6 +354,11 @@ class Latitude_Official extends PaymentModule
         return $this->display(__FILE__, 'admin-refund.tpl');
     }
 
+    /**
+     * Check if partial refund for current method is selected
+     * @param $params
+     * @throws BinaryPay_Exception
+     */
     public function hookActionOrderSlipAdd($params)
     {
         if (Tools::isSubmit('doPartialRefundLatitude')) {
@@ -305,6 +372,12 @@ class Latitude_Official extends PaymentModule
         }
     }
 
+    /**
+     * Check if refund option is needed
+     * @param $id_order
+     * @param $paymentGatewayName
+     * @return bool
+     */
     public function isCustomRefundNeeded($id_order, $paymentGatewayName)
     {
         /** @var OrderCore $order */
@@ -354,6 +427,7 @@ class Latitude_Official extends PaymentModule
      * Fetch the configuration from the Latitude Finance API
      * @see  https://api.uat.latitudepay.com/v3/api-doc/index.html#operation/getConfiguration
      * @return array
+     * @throws Exception
      */
     public function getConfiguration()
     {
@@ -381,7 +455,6 @@ class Latitude_Official extends PaymentModule
     public function getCredentials()
     {
         $environment = Tools::getValue(self::ENVIRONMENT, Configuration::get(self::ENVIRONMENT));
-        $publicKey = $privateKey = '';
         switch ($environment) {
             case self::ENVIRONMENT_SANDBOX:
             case self::ENVIRONMENT_DEVELOPMENT:
@@ -408,6 +481,16 @@ class Latitude_Official extends PaymentModule
         );
     }
 
+    private function isDebugEnabled() {
+        return Tools::getValue(self::LATITUDE_FINANCE_DEBUG_MODE, Configuration::get(self::LATITUDE_FINANCE_DEBUG_MODE));
+    }
+
+    /**
+     * Get payment gateway name base on currency code
+     * @param null $currencyCode
+     * @return string
+     * @throws Exception
+     */
     public function getPaymentGatewayNameByCurrencyCode($currencyCode = null)
     {
         $countryToCurrencyCode = [
@@ -442,6 +525,11 @@ class Latitude_Official extends PaymentModule
         return $gatewayName;
     }
 
+    /**
+     * Get gateway instance
+     * @param null $gatewayName
+     * @return BinaryPay|false|mixed|object|string|void
+     */
     public function getGateway($gatewayName = null)
     {
         $message = '';
@@ -471,11 +559,10 @@ class Latitude_Official extends PaymentModule
         if (!$this->gateway) {
             $messagePrefix = "Message: ";
             $message = $message && $message !== $messagePrefix ? $message : 'The gateway object did not initialized correctly.';
-            BinaryPay::log($message, false, 'prestashop-latitude-finance.log');
+            BinaryPay::log($message, false, 'latitudepay-finance-' . date('Y-m-d') . '.log');
             return false;
         }
 
-        // log everything
         if (Configuration::get(self::LATITUDE_FINANCE_DEBUG_MODE)) {
             $this->gateway->setConfig(['debug' => true]);
         }
@@ -523,9 +610,13 @@ class Latitude_Official extends PaymentModule
         return $this->display(__FILE__, 'payment.tpl');
     }
 
+    /**
+     * Get payment method logo URL
+     * @return string
+     * @throws Exception
+     */
     protected function getPaymentLogo()
     {
-        $paymentLogo = '';
         switch ($this->gatewayName) {
             case self::GENOAPAY_PAYMENT_METHOD_CODE:
                 $paymentLogo =  (Configuration::get('PS_SSL_ENABLED') ? _PS_BASE_URL_SSL_ : _PS_BASE_URL_) . $this->_path . 'logos/genoapay.svg';
@@ -535,12 +626,17 @@ class Latitude_Official extends PaymentModule
                 break;
             default:
                 throw new Exception("Failed to get the payment logo from the current gateway name.");
-                break;
         }
 
         return $paymentLogo;
     }
 
+    /**
+     * Display payment snippet inside product detail page
+     * @param $params
+     * @return mixed
+     * @throws Exception
+     */
     public function hookDisplayProductButtons($params)
     {
         $currency = $this->context->currency;
@@ -566,12 +662,20 @@ class Latitude_Official extends PaymentModule
             'currency_code' => $currencyCode,
             'payment_logo' => $this->getPaymentLogo(),
             'base_dir' => Configuration::get('PS_SSL_ENABLED') ? _PS_BASE_URL_SSL_ : _PS_BASE_URL_ . __PS_BASE_URI__,
-            'current_module_uri' => $this->_path
+            'current_module_uri' => $this->_path,
+            'images_api_url' => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
+            'full_block' => false,
+            'amount' => $price
         ));
 
         return $this->display(__FILE__, 'product_latitude_finance.tpl');
     }
 
+    /**
+     * Check if order currency is matched with cart currency
+     * @param $cart
+     * @return bool
+     */
     public function checkCurrency($cart)
     {
         $currency_order = new Currency($cart->id_currency);
@@ -609,6 +713,10 @@ class Latitude_Official extends PaymentModule
         return $output;
     }
 
+    /**
+     * Render backend configuration form
+     * @return mixed
+     */
     public function renderSettingsForm()
     {
          $fields_form = array(
@@ -702,6 +810,13 @@ class Latitude_Official extends PaymentModule
                         'readonly' => true,
                         'name' => self::LATITUDE_FINANCE_MAX_ORDER_TOTAL,
                     ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Images API URL'),
+                        'desc'  => $this->l('The URL of Images API that will be used for display payment snippets and modal.'),
+                        'readonly' => false,
+                        'name' => self::LATITUDE_FINANCE_IMAGES_API_URL,
+                    ),
                 ),
                 'submit' => array(
                     'name' => 'submitSave',
@@ -731,6 +846,10 @@ class Latitude_Official extends PaymentModule
         return $helper->generateForm(array($fields_form));
     }
 
+    /**
+     * Get available environments
+     * @return string[][]
+     */
     public function getEnvironments()
     {
         return array(
@@ -741,14 +860,14 @@ class Latitude_Official extends PaymentModule
             array(
                 'id_option' => self::ENVIRONMENT_PRODUCTION,
                 'environment' => 'Production'
-            ),
-            // array(
-            //     'id_option' => self::ENVIRONMENT_DEVELOPMENT,
-            //     'environment' => 'Development'
-            // ),
+            )
         );
     }
 
+    /**
+     * Get module configurations
+     * @return array
+     */
     public function getConfigFieldsValues()
     {
         return array(
@@ -762,11 +881,13 @@ class Latitude_Official extends PaymentModule
             self::LATITUDE_FINANCE_PRIVATE_KEY => Tools::getValue(self::LATITUDE_FINANCE_PRIVATE_KEY, Configuration::get(self::LATITUDE_FINANCE_PRIVATE_KEY)),
             self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY => Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY, Configuration::get(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY)),
             self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY => Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY, Configuration::get(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY)),
+            self::LATITUDE_FINANCE_IMAGES_API_URL => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
         );
     }
 
     /**
-     * @todo: Dynamic payment gateway by store currency
+     * Store user settings
+     * @return mixed
      */
     protected function postProcess()
     {
@@ -800,6 +921,11 @@ class Latitude_Official extends PaymentModule
         }
     }
 
+    /**
+     * Get minimum order amount
+     * @return mixed|string
+     * @throws Exception
+     */
     protected function getMinOrderTotal()
     {
         if (!$this->configuration) {
@@ -808,6 +934,11 @@ class Latitude_Official extends PaymentModule
         return $this->getConfigData('minimumAmount', $this->configuration);
     }
 
+    /**
+     * Get maximum order amount
+     * @return mixed|string
+     * @throws Exception
+     */
     protected function getMaxOrderTotal()
     {
         if (!$this->configuration) {
@@ -816,6 +947,12 @@ class Latitude_Official extends PaymentModule
         return $this->getConfigData('maximumAmount', $this->configuration);
     }
 
+    /**
+     * Check if order total is allowed
+     * @param $amount
+     * @return bool
+     * @throws Exception
+     */
     protected function isOrderAmountAvailable($amount)
     {
         if ($amount > $this->getMaxOrderTotal() || $amount < $this->getMinOrderTotal()) {
@@ -824,12 +961,24 @@ class Latitude_Official extends PaymentModule
         return true;
     }
 
+    /**
+     * Get a configuration value
+     * @param $key
+     * @param $array
+     * @param string $default
+     * @return mixed|string
+     */
     public function getConfigData($key, $array, $default = '')
     {
         $value = isset($array[$key]) ? $array[$key] : $default;
         return $value;
     }
 
+    /**
+     * Get order available refund amount
+     * @param $orderId
+     * @return false|float
+     */
     public static function getAvailableRefundAmount($orderId) {
         /** @var OrderCore $order */
         $order = new Order($orderId);
@@ -839,6 +988,12 @@ class Latitude_Official extends PaymentModule
         return false;
     }
 
+    /**
+     * Add private message
+     * @param $id_order
+     * @param $message
+     * @return false
+     */
     public function _addNewPrivateMessage($id_order, $message)
     {
         if (!(bool) $id_order) {
@@ -978,18 +1133,32 @@ class Latitude_Official extends PaymentModule
         return $productList;
     }
 
+    /**
+     * Get order currency code
+     * @param $order
+     * @return mixed
+     */
     public static function getOrderCurrencyCode($order) {
         $currencyId = $order->id_currency;
         $currency = new Currency($currencyId);
         return $currency->iso_code;
     }
 
+    /**
+     * Get and set the instance's gateway name base on order payment method
+     * @param $order
+     */
     public function setGatewayNameByPaymentMethod($order) {
         if ($gatewayName = $this->_getGatewayNameByPaymentMethod($order)) {
             $this->gatewayName = $gatewayName;
         }
     }
 
+    /**
+     * Get gateway name base on payment method
+     * @param $order
+     * @return false
+     */
     protected function _getGatewayNameByPaymentMethod($order) {
         if (in_array($order->payment, self::ALLOWED_PAYMENT_GATEWAYS)) {
             return $order->payment;
@@ -997,6 +1166,10 @@ class Latitude_Official extends PaymentModule
         return false;
     }
 
+    /**
+     * Set payment gateway
+     * @throws Exception
+     */
     protected function _setPaymentGateway() {
         $order = null;
         if (Tools::getValue('id_order')) {
@@ -1021,6 +1194,11 @@ class Latitude_Official extends PaymentModule
         }
     }
 
+    /**
+     * Get currency code by payment method name
+     * @param $paymentMethod
+     * @return false|string
+     */
     protected function _getCurrencyCodeByPaymentMethod($paymentMethod) {
         switch ($paymentMethod) {
             case self::LATITUDE_PAYMENT_METHOD_CODE:
@@ -1032,6 +1210,11 @@ class Latitude_Official extends PaymentModule
         }
     }
 
+    /**
+     * Update order status
+     * @param $orderId
+     * @param $statusId
+     */
     protected function _changeOrderStatus($orderId, $statusId) {
         /** @var OrderHistoryCore $history */
         $history = new OrderHistory();
@@ -1041,6 +1224,10 @@ class Latitude_Official extends PaymentModule
         $history->save();
     }
 
+    /**
+     *
+     * @return bool
+     */
     protected function updateDatabase() {
         /* Create Refund transactions table table */
         return Db::getInstance()->Execute('

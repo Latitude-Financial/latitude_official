@@ -124,7 +124,7 @@ class WC_LatitudeFinance_Http
             $info .= "RESPONSE:\n";
             $info .= json_encode($response) ."\n\n";
             $info .="======DEBUG INFO ENDS========\n\n\n";
-            BinaryPay::log($info);
+            BinaryPay::log($info, true, 'latitudepay-finance-' . date('Y-m-d') . '.log');
         }
         curl_close($curl);
         return $response;
