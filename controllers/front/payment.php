@@ -245,7 +245,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
         foreach ($items as $_item) {
             $_item = (object) $_item;
             $product_line_item = [
-                'name'          => $_item->name,
+                'name'          => htmlspecialchars($_item->name),
                 'price' => [
                     'amount'    => round($_item->total_wt, 2),
                     'currency'  => $currencyCode
