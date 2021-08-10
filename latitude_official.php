@@ -42,6 +42,46 @@ class Latitude_Official extends PaymentModule
     /**
      * @var string
      */
+    const PRODUCT_LPAY = 'LPAY';
+
+    /**
+     * @var string
+     */
+    const PRODUCT_LPAYPLUS = 'LPAYPLUS';
+
+    /**
+     * @var string
+     */
+    const PRODUCT_CO_PRESENTMENT = 'LPAY,LPAYPLUS';
+
+    /**
+     * @var string
+     */
+    const PRODUCT_GPAY = 'GPAY';
+
+    /**
+     * @var string
+     */
+    const PAYMENT_TERM_6MONTHS = '6';
+
+    /**
+     * @var string
+     */
+    const PAYMENT_TERM_12MONTHS = '12';
+
+    /**
+     * @var string
+     */
+    const PAYMENT_TERM_18MONTHS = '18';
+
+    /**
+     * @var string
+     */
+    const PAYMENT_TERM_24MONTHS = '24';
+
+    /**
+     * @var string
+     */
     const ENVIRONMENT_PRODUCTION = 'production';
 
     /**
@@ -53,6 +93,16 @@ class Latitude_Official extends PaymentModule
      * @var string - The data would be fetch from the API
      */
     const LATITUDE_FINANCE_TITLE = 'LATITUDE_FINANCE_TITLE';
+
+    /**
+     * @var string
+     */
+    const LATITUDE_FINANCE_PRODUCT = 'LATITUDE_FINANCE_PRODUCT';
+
+    /**
+     * @var string
+     */
+    const LATITUDE_FINANCE_PAYMENT_TERMS = 'LATITUDE_FINANCE_PAYMENT_TERMS';
 
     /**
      * @var string
@@ -107,6 +157,11 @@ class Latitude_Official extends PaymentModule
     /**
      * @var string
      */
+    const DEFAULT_IMAGES_API_VERSION = 'v2';
+
+    /**
+     * @var string
+     */
     protected $_html = '';
 
     /**
@@ -124,14 +179,14 @@ class Latitude_Official extends PaymentModule
     * @var array
     */
     public $hooks = array(
-        'header',
         'backOfficeHeader',
         'payment',
         'displayProductButtons',
         'displayPaymentReturn',
         'displayTop',
         'displayAdminOrderContentOrder',
-        'actionOrderSlipAdd'
+        'actionOrderSlipAdd',
+        'displayShoppingCart'
     );
 
     /**
@@ -152,7 +207,7 @@ class Latitude_Official extends PaymentModule
          */
         $this->tab = 'payments_gateways';
 
-        $this->version = '1.1';
+        $this->version = '1.2';
         $this->author = 'Latitude Financial Services';
 
         /**
@@ -277,16 +332,6 @@ class Latitude_Official extends PaymentModule
     }
 
     /**
-     * Append stylesheet files into template header
-     * @param $params
-     */
-    public function hookHeader($params)
-    {
-         $this->context->controller->addCSS($this->_path . '/views/css/genoapay.css');
-         $this->context->controller->addCSS($this->_path . '/views/css/latitudepay.css');
-    }
-
-    /**
      * Add refund script to backend template
      * @return null
      */
@@ -300,6 +345,10 @@ class Latitude_Official extends PaymentModule
                 Media::addJsDefL('latitude_refund_js', $this->l('Refund '.$paymentGatewayName));
                 $this->context->controller->addJS(_PS_MODULE_DIR_ . $this->name . '/views/js/latitude_order.js');
             }
+        }
+
+        if (Tools::getValue('controller') == "AdminModules" && Tools::getValue('configure') === 'latitude_official') {
+            $this->context->controller->addJS(_PS_MODULE_DIR_ . $this->name . '/views/js/configuration.js');
         }
 
         return null;
@@ -592,13 +641,6 @@ class Latitude_Official extends PaymentModule
             ));
         }
 
-        /**
-         * @todo: support the backend currency and country registration
-         */
-        // if (!$this->checkCurrency($params['cart'])) {
-        //     return;
-        // }
-
         $this->smarty->assign(array(
             'this_path' => $this->_path,
             'logo' => $this->getPaymentLogo(),
@@ -644,31 +686,44 @@ class Latitude_Official extends PaymentModule
         $currencyCode = $this->context->currency->iso_code;
         $gatewayName = $this->getPaymentGatewayNameByCurrencyCode($currencyCode);
 
-        $containerClass = "wc-latitudefinance-" . strtolower($gatewayName) . "-container";
-        $paymentInfo = $this->l("Available now.");
-
-        if ($price >= 20 && $price <= 1500) {
-           $weekly = round($price / 10, 2);
-           $paymentInfo = "10 weekly payments of <strong>$${weekly}</strong>";
-        }
-
-        $color = ($gatewayName == "Latitudepay") ? "rgb(57, 112, 255)" : "rgb(49, 181, 156)";
-
         $this->smarty->assign(array(
-            'container_class' => $containerClass,
-            'color' => $color,
-            'gateway_name' => strtolower($gatewayName),
-            'payment_info' => $paymentInfo,
-            'currency_code' => $currencyCode,
-            'payment_logo' => $this->getPaymentLogo(),
-            'base_dir' => Configuration::get('PS_SSL_ENABLED') ? _PS_BASE_URL_SSL_ : _PS_BASE_URL_ . __PS_BASE_URI__,
-            'current_module_uri' => $this->_path,
+            'services' => Configuration::get(self::LATITUDE_FINANCE_PRODUCT),
+            'payment_terms' => Configuration::get(self::LATITUDE_FINANCE_PAYMENT_TERMS),
             'images_api_url' => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
+            'images_api_version' => self::DEFAULT_IMAGES_API_VERSION,
             'full_block' => false,
-            'amount' => $price
+            'amount' => $price,
+            'gateway_name' => $gatewayName
         ));
 
-        return $this->display(__FILE__, 'product_latitude_finance.tpl');
+        $result = $this->display(__FILE__, 'payment_snippet.tpl');
+        return $result;
+    }
+
+    public function hookDisplayShoppingCart($params) {
+        $cart = $params['cart'];
+        if ($cart) {
+            $price = $cart->getOrderTotal();
+            if ($price >= $this->getMinOrderTotal()) {
+                $currencyCode = $this->context->currency->iso_code;
+                $gatewayName = $this->getPaymentGatewayNameByCurrencyCode($currencyCode);
+                if ($gatewayName) {
+                    $this->smarty->assign(array(
+                        'services' => $this->getServices($gatewayName),
+                        'payment_terms' => Configuration::get(self::LATITUDE_FINANCE_PAYMENT_TERMS),
+                        'base_dir' => Configuration::get('PS_SSL_ENABLED') ? _PS_BASE_URL_SSL_ : _PS_BASE_URL_ . __PS_BASE_URI__,
+                        'current_module_uri' => $this->_path,
+                        'images_api_url' => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
+                        'images_api_version' => self::DEFAULT_IMAGES_API_VERSION,
+                        'full_block' => false,
+                        'amount' => $price,
+                        'gateway_name' => $gatewayName
+                    ));
+
+                    return $this->display(__FILE__, 'shopping_cart_snippet.tpl');
+                }
+            }
+        }
     }
 
     /**
@@ -726,6 +781,29 @@ class Latitude_Official extends PaymentModule
                     'icon' => 'icon-cogs',
                 ),
                 'input' => array(
+                    array(
+                        'type' => 'select',
+                        'label' => $this->l('Product'),
+                        'name' => self::LATITUDE_FINANCE_PRODUCT,
+                        'options' => array(
+                            'query' => $this->getProducts(),
+                            'id' => 'id_option',
+                            'name' => 'product',
+                        )
+                    ),
+                    array(
+                        'type' => 'select',
+                        'multiple' => true,
+                        'label' => $this->l('Payment Terms'),
+                        'name' => self::LATITUDE_FINANCE_PAYMENT_TERMS,
+                        'desc' => $this->l("The following payment terms will be displayed on your PDP Modal. Please check your contract to see what payment terms which will be offered to your customers"),
+                        'disabled' => $this->shouldDisplayPaymentTerms() ? false : true,
+                        'options' => [
+                            'query' => $this->getPaymentTerms(),
+                            'id' => 'id_option',
+                            'name' => 'payment_term'
+                        ]
+                    ),
                     array(
                         'type' => 'text',
                         'label' => $this->l('Production API Key'),
@@ -879,6 +957,8 @@ class Latitude_Official extends PaymentModule
             self::LATITUDE_FINANCE_MAX_ORDER_TOTAL => Configuration::get(self::LATITUDE_FINANCE_MAX_ORDER_TOTAL),
             self::LATITUDE_FINANCE_PUBLIC_KEY => Tools::getValue(self::LATITUDE_FINANCE_PUBLIC_KEY, Configuration::get(self::LATITUDE_FINANCE_PUBLIC_KEY)),
             self::LATITUDE_FINANCE_PRIVATE_KEY => Tools::getValue(self::LATITUDE_FINANCE_PRIVATE_KEY, Configuration::get(self::LATITUDE_FINANCE_PRIVATE_KEY)),
+            self::LATITUDE_FINANCE_PRODUCT => Tools::getValue(self::LATITUDE_FINANCE_PRODUCT, Configuration::get(self::LATITUDE_FINANCE_PRODUCT)),
+            self::LATITUDE_FINANCE_PAYMENT_TERMS . '[]' => Tools::getValue(self::LATITUDE_FINANCE_PAYMENT_TERMS) ? Tools::getValue(self::LATITUDE_FINANCE_PAYMENT_TERMS) : explode(',', Configuration::get(self::LATITUDE_FINANCE_PAYMENT_TERMS)),
             self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY => Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY, Configuration::get(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY)),
             self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY => Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY, Configuration::get(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY)),
             self::LATITUDE_FINANCE_IMAGES_API_URL => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
@@ -912,6 +992,16 @@ class Latitude_Official extends PaymentModule
             Configuration::updateValue(self::LATITUDE_FINANCE_PRIVATE_KEY, Tools::getValue(self::LATITUDE_FINANCE_PRIVATE_KEY));
             Configuration::updateValue(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY, Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PUBLIC_KEY));
             Configuration::updateValue(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY, Tools::getValue(self::LATITUDE_FINANCE_SANDBOX_PRIVATE_KEY));
+
+            Configuration::updateValue(self::LATITUDE_FINANCE_PRODUCT, Tools::getValue(self::LATITUDE_FINANCE_PRODUCT));
+
+            if ($this->shouldDisplayPaymentTerms()) {
+                $paymentTerms = Tools::getValue(self::LATITUDE_FINANCE_PAYMENT_TERMS);
+                if (!$paymentTerms || empty($paymentTerms)) {
+                    return $this->displayError($this->l('You have to set at least one value for Payment Terms!'));
+                }
+                Configuration::updateValue(self::LATITUDE_FINANCE_PAYMENT_TERMS, implode(',', $paymentTerms));
+            }
 
             if (Configuration::updateValue('latitude_offical', (int)Tools::getValue('latitude_offical'))) {
                 return $this->displayConfirmation($this->l('Settings updated'));
@@ -1241,5 +1331,69 @@ class Latitude_Official extends PaymentModule
 		`payment_gateway` varchar(50) NOT null,
 		PRIMARY KEY (`id_refund`)
 		) ENGINE='._MYSQL_ENGINE_.' DEFAULT CHARSET=utf8');
+    }
+
+    /**
+     * Get available product options
+     * @return string[][]
+     */
+    public function getProducts() {
+        return array(
+            array(
+                'id_option' => self::PRODUCT_LPAY,
+                'product' => 'LatitudePay'
+            ),
+            array(
+                'id_option' => self::PRODUCT_LPAYPLUS,
+                'product' => 'LatitudePay+'
+            ),
+            array(
+                'id_option' => self::PRODUCT_CO_PRESENTMENT,
+                'product' => 'Co-Presentment (LatitudePay & LatitudePay+)'
+            ),
+        );
+    }
+
+    /**
+     * Get availabe payment term options
+     * @return string[][]
+     */
+    public function getPaymentTerms() {
+        return array(
+            array(
+                'id_option' => self::PAYMENT_TERM_6MONTHS,
+                'payment_term' => '6 months'
+            ),
+            array(
+                'id_option' => self::PAYMENT_TERM_12MONTHS,
+                'payment_term' => '12 months'
+            ),
+            array(
+                'id_option' => self::PAYMENT_TERM_18MONTHS,
+                'payment_term' => '18 months'
+            ),
+            array(
+                'id_option' => self::PAYMENT_TERM_24MONTHS,
+                'payment_term' => '24 months'
+            )
+        );
+    }
+
+    /**
+     * @return bool
+     */
+    private function shouldDisplayPaymentTerms() {
+        return in_array(Tools::getValue(self::LATITUDE_FINANCE_PRODUCT), [
+            self::PRODUCT_LPAYPLUS, self::PRODUCT_CO_PRESENTMENT
+        ]);
+    }
+
+    /**
+     * Get configured service
+     * @param $gatewayName
+     * @return false|string
+     */
+    public static function getServices($gatewayName) {
+        return $gatewayName === self::GENOAPAY_PAYMENT_METHOD_CODE ? self::PRODUCT_GPAY : Configuration::get(self::LATITUDE_FINANCE_PRODUCT);
     }
 }
