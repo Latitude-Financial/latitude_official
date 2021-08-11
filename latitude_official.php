@@ -681,23 +681,25 @@ class Latitude_Official extends PaymentModule
      */
     public function hookDisplayProductButtons($params)
     {
-        $currency = $this->context->currency;
-        $price = Tools::ps_round($params['product']->getPrice(), (int) $currency->decimals * _PS_PRICE_DISPLAY_PRECISION_);
-        $currencyCode = $this->context->currency->iso_code;
-        $gatewayName = $this->getPaymentGatewayNameByCurrencyCode($currencyCode);
+        $product = $params['product'];
+        if ($product->quantity) {
+            $currency = $this->context->currency;
+            $price = Tools::ps_round($product->getPrice(), (int) $currency->decimals * _PS_PRICE_DISPLAY_PRECISION_);
+            $currencyCode = $this->context->currency->iso_code;
+            $gatewayName = $this->getPaymentGatewayNameByCurrencyCode($currencyCode);
 
-        $this->smarty->assign(array(
-            'services' => Configuration::get(self::LATITUDE_FINANCE_PRODUCT),
-            'payment_terms' => Configuration::get(self::LATITUDE_FINANCE_PAYMENT_TERMS),
-            'images_api_url' => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
-            'images_api_version' => self::DEFAULT_IMAGES_API_VERSION,
-            'full_block' => false,
-            'amount' => $price,
-            'gateway_name' => $gatewayName
-        ));
+            $this->smarty->assign(array(
+                'services' => Configuration::get(self::LATITUDE_FINANCE_PRODUCT),
+                'payment_terms' => Configuration::get(self::LATITUDE_FINANCE_PAYMENT_TERMS),
+                'images_api_url' => Tools::getValue(self::LATITUDE_FINANCE_IMAGES_API_URL, self::DEFAULT_IMAGES_API_URL),
+                'images_api_version' => self::DEFAULT_IMAGES_API_VERSION,
+                'full_block' => false,
+                'amount' => $price,
+                'gateway_name' => $gatewayName
+            ));
 
-        $result = $this->display(__FILE__, 'payment_snippet.tpl');
-        return $result;
+            return $this->display(__FILE__, 'payment_snippet.tpl');
+        }
     }
 
     public function hookDisplayShoppingCart($params) {
@@ -796,7 +798,7 @@ class Latitude_Official extends PaymentModule
                         'multiple' => true,
                         'label' => $this->l('Payment Terms'),
                         'name' => self::LATITUDE_FINANCE_PAYMENT_TERMS,
-                        'desc' => $this->l("The following payment terms will be displayed on your PDP Modal. Please check your contract to see what payment terms which will be offered to your customers"),
+                        'desc' => $this->l("The text should as follows: Please note you can select more than one option by holding the CTRL(On Windows) or COMMAND (On MAC) and clicking on the payment terms you wish to add. The following payment terms will be displayed on your PDP Modal. Please check your contract to see what payment terms can be offered to your customers"),
                         'disabled' => $this->shouldDisplayPaymentTerms() ? false : true,
                         'options' => [
                             'query' => $this->getPaymentTerms(),
