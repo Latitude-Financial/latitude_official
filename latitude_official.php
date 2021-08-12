@@ -1157,24 +1157,7 @@ class Latitude_Official extends PaymentModule
                 be processed unless there is a valid transaction associated with the order.', $order->id));
             }
             $response = $gateway->refund($refund);
-            // Log the refund response
-            BinaryPay::log(json_encode($response), true, 'prestashop-latitude-finance.log');
-            if (Configuration::get(self::LATITUDE_FINANCE_DEBUG_MODE)) {
-                if (isset($response['refundId'])) {
-                    $message = "Refund ID: ".$response['refundId'];
-                    $message .= "\n";
-                    $message .= "Refund Date: ".$response['refundDate'];
-                    $message .= "\n";
-                    $message .= "Amount: ".$amount;
-                    $this->_addNewPrivateMessage($order->id, $message);
-                } else {
-                    $this->_addNewPrivateMessage($order->id, "Response from the gateway: ".json_encode($response));
-                }
-
-            }
-
             if (isset($response['refundId'])) {
-
                 $rTransaction = new LatitudeRefundTransaction();
                 $rTransaction->id_refund = $response['refundId'];
                 $rTransaction->id_order = $order->id;
