@@ -1,1 +1,1 @@
-<img class="lpay_snippet" src="{$images_api_url}snippet.svg?amount={$amount}{if $full_block == true}&full_block=1{/if}" alt="{$gateway_name}" />
+<img style="max-width: 100%; cursor: pointer" class="lpay_snippet" src="{$images_api_url}{$images_api_version}/snippet.svg?amount={$amount}{if $full_block == true}&style=checkout{/if}&services={if $services }{$services}{else}LPAY{/if}{if $services == 'LPAYPLUS' || $services == 'LPAY,LPAYPLUS'}&terms={$payment_terms}{/if}" alt="{$gateway_name}" />

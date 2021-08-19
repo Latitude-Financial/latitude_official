@@ -2,7 +2,7 @@
 <module>
 	<name>latitude_official</name>
 	<displayName><![CDATA[Latitude Finance Payment Module]]></displayName>
-	<version><![CDATA[1.1]]></version>
+	<version><![CDATA[1.2]]></version>
 	<description><![CDATA[Available to NZ and OZ residents who are 18 years old and over and have a valid debit or credit card.]]></description>
 	<author><![CDATA[Latitude Financial Services]]></author>
 	<tab><![CDATA[payments_gateways]]></tab>
