@@ -106,7 +106,6 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
          * @var string
          */
         $purchaseUrl = '';
-        $serializeCartObject = serialize($this->context->cart);
 
         try {
             $cookie = $this->getCookie();
@@ -125,6 +124,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             $amount     = $cart->getOrderTotal();
             $customer   = $this->context->customer;
             $address    = new Address($cart->id_address_delivery);
+            $cookie->cart_amount = $amount;
 
             $payment = array(
                 BinaryPay_Variable::REFERENCE                => (string) $reference,
@@ -157,6 +157,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             }
 
             $response = $gateway->purchase($payment);
+            $cookie->payment_token = $response['token'] ?? null;
             $purchaseUrl = $this->module->getConfigData('paymentUrl', $response);
         } catch (BinaryPay_Exception $e) {
             BinaryPay::log($e->getMessage(), true, 'prestashop-latitude-finance.log');
