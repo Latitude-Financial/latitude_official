@@ -39,40 +39,41 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
         $responseState = Tools::getValue('result');
 
         // Verify payment token
-        $token = $this->context->cookie->payment_token;
-        $this->context->cookie->payment_token = null;
+        $token = $this->context->cookie->__get('payment_token');
+        $this->context->cookie->__unset('payment_token');
 
         if ($token !== Tools::getValue('token')) {
-            $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage("Invalid payment token.");
+            $this->context->cookie->__set('latitude_finance_redirect_error', $this->translateErrorMessage("Invalid payment token."));
             Tools::redirect('index.php?controller=order&step=1');
         }
 
         // Verify signature
         if (!$this->validateSignature($gatewayName)) {
-            $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage("Invalid response signature.");
-            Tools::redirect('index.php?controller=order&step=1');
-        }
-
-        // Verify cart amount
-        $verifyCartAmount = $this->context->cookie->cart_amount;
-        $this->context->cookie->cart_amount = null;
-
-        if ( $verifyCartAmount && $verifyCartAmount != $cart->getOrderTotal() ) {
-            $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage("Invalid cart amount.");
+            $this->context->cookie->__set('latitude_finance_redirect_error', $this->translateErrorMessage("Invalid response signature."));
             Tools::redirect('index.php?controller=order&step=1');
         }
 
         // success
         if (in_array($responseState, self::PAYMENT_SUCCESS_STATES)) {
+            $verifyCartAmount = floatval($this->context->cookie->__get('cart_amount'));
+            if (!$verifyCartAmount) {
+                $this->context->cookie->__set('latitude_finance_redirect_error', $this->translateErrorMessage("Your order was placed already."));
+                Tools::redirect('index.php?controller=order&step=1');
+            }
+            $this->context->cookie->__unset('cart_amount');
+            $orderAmount = $cart->getOrderTotal();
             $this->module->validateOrder(
                 $cart->id,
-                self::PAYMENT_ACCEPECTED,
-                $cart->getOrderTotal(),
+                $verifyCartAmount< $orderAmount ? self::PAYMENT_ERROR : self::PAYMENT_ACCEPECTED,
+                $verifyCartAmount,
                 $gatewayName,
-                '',
-                array(
-                    'transaction_id' => Tools::getValue('token')
-                )
+                $verifyCartAmount < $orderAmount ?
+                    sprintf(
+                        'Invalid payment amount detected! Correct amount: %s, paid: %s',
+                        $verifyCartAmount,
+                        $orderAmount
+                    ) : '',
+                [ 'transaction_id' => Tools::getValue('token') ]
             );
         } else {
             $message = (is_array($response)) ? json_encode($response) : 'Error response from Latitude Financial services API. The response data cannot be recorded.';

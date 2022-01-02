@@ -131,7 +131,8 @@ class Latitude_Official extends PaymentModule
         'displayPaymentReturn',
         'displayTop',
         'displayAdminOrderContentOrder',
-        'actionOrderSlipAdd'
+        'actionOrderSlipAdd',
+        'actionObjectAddBefore'
     );
 
     /**
@@ -152,7 +153,7 @@ class Latitude_Official extends PaymentModule
          */
         $this->tab = 'payments_gateways';
 
-        $this->version = '1.2';
+        $this->version = '1.3';
         $this->author = 'Latitude Financial Services';
 
         /**
@@ -670,6 +671,27 @@ class Latitude_Official extends PaymentModule
 
         return $this->display(__FILE__, 'product_latitude_finance.tpl');
     }
+
+    /**
+     * Assign the generated order reference to new order
+     * @param $params
+     * @return void
+     */
+    public function hookActionObjectAddBefore($params)
+    {
+        $order = $params['object'];
+        if ($order instanceof Order) {
+            $cookie = $this->context->cookie;
+            $reservedReference = $cookie->__get('lpay_reserve_order_reference');
+            $cartId = $cookie->__get('lpay_reserve_order_cart_id');
+            if ( $reservedReference && $cartId && $cartId == $order->id_cart ) {
+                $order->reference = $reservedReference;
+                $cookie->__unset('lpay_reserve_order_reference');
+                $cookie->__unset('lpay_reserve_order_cart_id');
+            }
+        }
+    }
+
 
     /**
      * Check if order currency is matched with cart currency

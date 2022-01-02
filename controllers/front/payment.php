@@ -117,6 +117,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
                 return false;
             }
             $reference  = $this->getReferenceNumber();
+            $cookie->__set('lpay_reserve_order_reference', $reference);
             // Save the reference for validation when response coming back from
             $cookie->reference = $reference;
 
@@ -126,8 +127,10 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             $address    = new Address($cart->id_address_delivery);
             $cookie->cart_amount = $amount;
 
+            $cookie->__set('lpay_reserve_order_cart_id', $cart->id);
+
             $payment = array(
-                BinaryPay_Variable::REFERENCE                => (string) $reference,
+                BinaryPay_Variable::REFERENCE                => $reference,
                 BinaryPay_Variable::AMOUNT                   => $amount,
                 BinaryPay_Variable::CURRENCY                 => $currency->iso_code ?: self::DEFAULT_VALUE,
                 BinaryPay_Variable::RETURN_URL               => $this->getReturnUrl(),
@@ -157,7 +160,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             }
 
             $response = $gateway->purchase($payment);
-            $cookie->payment_token = $response['token'] ?? null;
+            $cookie->__set('payment_token', $response['token'] ?? null);
             $purchaseUrl = $this->module->getConfigData('paymentUrl', $response);
         } catch (BinaryPay_Exception $e) {
             BinaryPay::log($e->getMessage(), true, 'prestashop-latitude-finance.log');
