@@ -69,7 +69,7 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
                 $gatewayName,
                 $verifyCartAmount < $orderAmount ?
                     sprintf(
-                        'Invalid payment amount detected! Correct amount: %s, paid: %s, token:',
+                        'Invalid payment amount detected! Correct amount: %s, paid: %s, token: %s',
                         $verifyCartAmount,
                         $orderAmount,
                         $token
