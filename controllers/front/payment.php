@@ -31,12 +31,7 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
         $purchaseUrl = '';
         $cart = $this->context->cart;
         $currency = $this->context->currency;
-
-        /**
-         * @todo: support the backend currency and country registration
-         */
-        // if (!$this->module->checkCurrency($cart))
-        //     Tools::redirect('index.php?controller=order');
+        $gatewayName = $this->module->getPaymentGatewayNameByCurrencyCode($currency->iso_code);
 
         try {
             $purchaseUrl = $this->getPurchaseUrl();
@@ -51,20 +46,17 @@ class latitude_officialpaymentModuleFrontController extends ModuleFrontControlle
             'currencies' => $this->module->getCurrency((int)$cart->id_currency),
             'total' => $cart->getOrderTotal(true, Cart::BOTH),
             'isoCode' => $this->context->language->iso_code,
-            'this_path_ssl' => Tools::getShopDomainSsl(true, true).__PS_BASE_URI__.'modules/'.$this->module->name.'/',
             'purchase_url' => $purchaseUrl,
             'payment_method' => Configuration::get(Latitude_Official::LATITUDE_FINANCE_TITLE),
             'payment_description' => Configuration::get(Latitude_Official::LATITUDE_FINANCE_DESCRIPTION),
-            'currency_code' => $currency->iso_code,
-            'currency_symbol' => $currency->sign,
-            'splited_payment' => Tools::ps_round($cart->getOrderTotal() / 10, (int) $currency->decimals * _PS_PRICE_DISPLAY_PRECISION_),
             'payment_checkout_logo' => $this->getPaymentCheckoutLogo(),
             'current_module_uri' => $this->module->getPathUri(),
-            'payment_gateway_name' => $this->module->getPaymentGatewayNameByCurrencyCode($currency->iso_code),
-            'branding_color' => ($currency->iso_code == "AUD") ? "rgb(57, 112, 255)" : "rgb(49, 181, 156)",
-            'doc_link' => ($currency->iso_code == "AUD") ? 'https://www.latitudepay.com/how-it-works/' : 'https://www.genoapay.com/how-it-works/',
+            'payment_gateway_name' => $gatewayName,
             'amount' => $cart->getOrderTotal(),
+            'services' => Latitude_Official::getServices($gatewayName),
+            'payment_terms' => Configuration::get(Latitude_Official::LATITUDE_FINANCE_PAYMENT_TERMS),
             'images_api_url' => Tools::getValue(Latitude_Official::LATITUDE_FINANCE_IMAGES_API_URL, Latitude_Official::DEFAULT_IMAGES_API_URL),
+            'images_api_version' => Latitude_Official::DEFAULT_IMAGES_API_VERSION,
             'full_block' => true
         ));
 

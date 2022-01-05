@@ -30,6 +30,13 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
         $currencyCode = $this->context->currency->iso_code;
         $gatewayName = $this->module->getPaymentGatewayNameByCurrencyCode($currencyCode);
 
+        if (Configuration::get(Latitude_Official::LATITUDE_FINANCE_DEBUG_MODE)) {
+            $logMessage = "======CALLBACK INFO STARTS======\n";
+            $logMessage .= json_encode(Tools::getAllValues(), JSON_PRETTY_PRINT);
+            $logMessage .= "\n======CALLBACK INFO ENDS======";
+            BinaryPay::log($logMessage, true, 'latitudepay-finance-' . date('Y-m-d') . '.log');
+        }
+
         if (!$this->context->cookie->reference || $this->context->cookie->reference !== $reference) {
             Tools::redirect(Context::getContext()->shop->getBaseURL(true));
         }
@@ -77,10 +84,6 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
                 [ 'transaction_id' => Tools::getValue('token') ]
             );
         } else {
-            $message = (is_array($response)) ? json_encode($response) : 'Error response from Latitude Financial services API. The response data cannot be recorded.';
-            // record all the FAILED status order
-            // just in case we lose the response messages and transaction token ID
-            BinaryPay::log($message, true, 'prestashop-latitude-finance.log');
             $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage(Tools::getValue('message'));
             Tools::redirect('index.php?controller=order&step=1');
         }
