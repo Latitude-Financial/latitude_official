@@ -1,4 +1,5 @@
 <?php
+
 class latitude_officialreturnModuleFrontController extends ModuleFrontController
 {
     public $display_column_left = false;
@@ -7,7 +8,7 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
      * @var integer - Order state
      */
     const PAYMENT_ACCEPECTED = 2;
-    const PAYMENT_ERROR = 8;
+    const PAYMENT_IN_PROGRESS = 3;
 
     const PAYMENT_SUCCESS_STATES = [
         'COMPLETED'
@@ -42,7 +43,6 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
         }
 
         $cart = $this->context->cart;
-        $response = Tools::getAllValues();
         $responseState = Tools::getValue('result');
 
         // Verify payment token
@@ -69,20 +69,27 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
             }
             $this->context->cookie->__unset('cart_amount');
             $orderAmount = $cart->getOrderTotal();
+            $isInvalidAmount = $verifyCartAmount < $orderAmount;
+            $errorMessage = sprintf(
+                'Invalid payment amount detected! Correct amount: %s, paid: %s, token: %s',
+                $verifyCartAmount,
+                $orderAmount,
+                $token
+            );
             $this->module->validateOrder(
                 $cart->id,
-                $verifyCartAmount< $orderAmount ? self::PAYMENT_ERROR : self::PAYMENT_ACCEPECTED,
+                $isInvalidAmount ? self::PAYMENT_IN_PROGRESS : self::PAYMENT_ACCEPECTED,
                 $verifyCartAmount,
                 $gatewayName,
-                $verifyCartAmount < $orderAmount ?
-                    sprintf(
-                        'Invalid payment amount detected! Correct amount: %s, paid: %s, token: %s',
-                        $verifyCartAmount,
-                        $orderAmount,
-                        $token
-                    ) : '',
-                [ 'transaction_id' => Tools::getValue('token') ]
+                $isInvalidAmount ? $errorMessage : '',
+                ['transaction_id' => Tools::getValue('token')]
             );
+            if ($isInvalidAmount) {
+                $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage(
+                    "There was an issue with your order, please contact administrator for more information."
+                );
+                Tools::redirect('index.php?controller=order&step=1');
+            }
         } else {
             $this->context->cookie->latitude_finance_redirect_error = $this->translateErrorMessage(Tools::getValue('message'));
             Tools::redirect('index.php?controller=order&step=1');
@@ -93,19 +100,19 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
         if (!Validate::isLoadedObject($customer))
             Tools::redirect('index.php?controller=order&step=1');
 
-        Tools::redirect('index.php?controller=order-confirmation&id_cart='. (int)$cart->id. '&id_module=' . (int)$this->module->id . '&id_order=' . $this->module->currentOrder. '&key=' . $customer->secure_key);
+        Tools::redirect('index.php?controller=order-confirmation&id_cart=' . (int)$cart->id . '&id_module=' . (int)$this->module->id . '&id_order=' . $this->module->currentOrder . '&key=' . $customer->secure_key);
     }
 
     /**
      * translateErrorMessage
-     * @param  string $message
+     * @param string $message
      * @return string
      */
     protected function translateErrorMessage($message)
     {
         switch ($message) {
             case 'The customer cancelled the purchase.':
-                $message =  'Your purchase order has been cancelled.';
+                $message = 'Your purchase order has been cancelled.';
                 break;
             default:
                 // do nothing
@@ -136,7 +143,7 @@ class latitude_officialreturnModuleFrontController extends ModuleFrontController
             '',
             true
         );
-        $signature = hash_hmac( 'sha256', base64_encode( $gluedString ), $gateway->getConfig( 'password' ) );
+        $signature = hash_hmac('sha256', base64_encode($gluedString), $gateway->getConfig('password'));
         return $signature === Tools::getValue('signature');
     }
 }
